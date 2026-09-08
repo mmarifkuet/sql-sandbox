@@ -1,55 +1,85 @@
 let db = null;
 
-// Initialize sql.js asynchronously
 async function initDatabase() {
   const config = {
-    // Locate the .wasm file hosted on CDN
     locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
   };
 
   try {
     const SQL = await initSqlJs(config);
-    db = new SQL.Database(); // Create an in-memory database
+    db = new SQL.Database();
     
     seedData();
-    document.getElementById('output').innerText = "Database ready! Click 'Run Query'.";
+    renderSchema();
+    document.getElementById('queryInput').value = "SELECT * FROM users;";
+    document.getElementById('statusBar').innerText = "Database initialized successfully.";
+    runQuery();
   } catch (err) {
-    document.getElementById('output').innerText = "Failed to load database: " + err.message;
+    document.getElementById('statusBar').innerText = "Failed to load database: " + err.message;
   }
 }
 
-// Seed the database with sample schema and data
 function seedData() {
   const setupSQL = `
     CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, role TEXT);
     INSERT INTO users VALUES (1, 'Alice', 'Admin');
     INSERT INTO users VALUES (2, 'Bob', 'Developer');
     INSERT INTO users VALUES (3, 'Charlie', 'Designer');
+
+    CREATE TABLE products (id INTEGER PRIMARY KEY, title TEXT, price REAL);
+    INSERT INTO products VALUES (101, 'Laptop', 1200.00);
+    INSERT INTO products VALUES (102, 'Wireless Mouse', 25.50);
+    INSERT INTO products VALUES (103, 'Mechanical Keyboard', 85.00);
   `;
   db.run(setupSQL);
 }
 
-// Execute query and build HTML table
+function renderSchema() {
+  const schemaList = document.getElementById('schemaList');
+  schemaList.innerHTML = '';
+
+  const res = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
+  if (res.length > 0) {
+    res[0].values.forEach(row => {
+      const tableName = row[0];
+      const div = document.createElement('div');
+      div.className = 'table-badge';
+      div.innerText = `📁 ${tableName}`;
+      schemaList.appendChild(div);
+    });
+  }
+}
+
+function setQuery(query) {
+  document.getElementById('queryInput').value = query;
+  runQuery();
+}
+
 function runQuery() {
   if (!db) return;
 
   const query = document.getElementById('queryInput').value;
-  const outputDiv = document.getElementById('output');
-  outputDiv.innerHTML = '';
+  const tableOutput = document.getElementById('tableOutput');
+  const statusBar = document.getElementById('statusBar');
+  tableOutput.innerHTML = '';
+
+  const startTime = performance.now();
 
   try {
     const results = db.exec(query);
+    const executionTime = (performance.now() - startTime).toFixed(2);
 
     if (results.length === 0) {
-      outputDiv.innerText = "Query executed successfully. (No output rows returned)";
+      statusBar.innerText = `Query executed in ${executionTime}ms. (0 rows returned)`;
       return;
     }
 
-    // Build table header and rows from results object
     const { columns, values } = results[0];
+    statusBar.innerText = `Query executed in ${executionTime}ms. Returned ${values.length} row(s).`;
+
     const table = document.createElement('table');
 
-    // Header row
+    // Header
     const trHead = document.createElement('tr');
     columns.forEach(col => {
       const th = document.createElement('th');
@@ -58,7 +88,7 @@ function runQuery() {
     });
     table.appendChild(trHead);
 
-    // Data rows
+    // Rows
     values.forEach(row => {
       const trRow = document.createElement('tr');
       row.forEach(cell => {
@@ -69,12 +99,12 @@ function runQuery() {
       table.appendChild(trRow);
     });
 
-    outputDiv.appendChild(table);
+    tableOutput.appendChild(table);
   } catch (error) {
-    outputDiv.innerText = "SQL Error: " + error.message;
+    statusBar.innerText = "Error executing query.";
+    tableOutput.innerHTML = `<span style="color: #ef4444; font-family: monospace;">SQL Error: ${error.message}</span>`;
   }
 }
 
-// Event Listeners
 document.getElementById('runBtn').addEventListener('click', runQuery);
 window.addEventListener('DOMContentLoaded', initDatabase);
