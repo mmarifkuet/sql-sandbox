@@ -1,4 +1,5 @@
 let db = null;
+let lastQueryResult = null;
 
 async function initDatabase() {
   const config = {
@@ -11,6 +12,7 @@ async function initDatabase() {
     
     seedData();
     renderSchema();
+    renderHistory();
     document.getElementById('queryInput').value = "SELECT * FROM users;";
     document.getElementById('statusBar').innerText = "Database initialized successfully.";
     runQuery();
@@ -55,6 +57,36 @@ function setQuery(query) {
   runQuery();
 }
 
+function saveToHistory(query) {
+  let history = JSON.parse(localStorage.getItem('sql_history') || '[]');
+  if (!history.includes(query)) {
+    history.unshift(query);
+    if (history.length > 5) history.pop();
+    localStorage.setItem('sql_history', JSON.stringify(history));
+    renderHistory();
+  }
+}
+
+function renderHistory() {
+  const historyList = document.getElementById('historyList');
+  const history = JSON.parse(localStorage.getItem('sql_history') || '[]');
+  
+  if (history.length === 0) {
+    historyList.innerHTML = '<span style="color: var(--text-muted); font-size: 0.8rem;">No history yet.</span>';
+    return;
+  }
+
+  historyList.innerHTML = '';
+  history.forEach(q => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerText = q;
+    div.title = q;
+    div.onclick = () => setQuery(q);
+    historyList.appendChild(div);
+  });
+}
+
 function runQuery() {
   if (!db) return;
 
@@ -62,6 +94,7 @@ function runQuery() {
   const tableOutput = document.getElementById('tableOutput');
   const statusBar = document.getElementById('statusBar');
   tableOutput.innerHTML = '';
+  lastQueryResult = null;
 
   const startTime = performance.now();
 
@@ -69,11 +102,14 @@ function runQuery() {
     const results = db.exec(query);
     const executionTime = (performance.now() - startTime).toFixed(2);
 
+    saveToHistory(query);
+
     if (results.length === 0) {
       statusBar.innerText = `Query executed in ${executionTime}ms. (0 rows returned)`;
       return;
     }
 
+    lastQueryResult = results[0];
     const { columns, values } = results[0];
     statusBar.innerText = `Query executed in ${executionTime}ms. Returned ${values.length} row(s).`;
 
@@ -106,5 +142,29 @@ function runQuery() {
   }
 }
 
+function exportToCSV() {
+  if (!lastQueryResult) {
+    alert("No query results available to export!");
+    return;
+  }
+
+  const { columns, values } = lastQueryResult;
+  let csvContent = "data:text/csv;charset=utf-8,";
+
+  csvContent += columns.join(",") + "\n";
+  values.forEach(row => {
+    csvContent += row.join(",") + "\n";
+  });
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "sql_results.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 document.getElementById('runBtn').addEventListener('click', runQuery);
+document.getElementById('exportBtn').addEventListener('click', exportToCSV);
 window.addEventListener('DOMContentLoaded', initDatabase);
