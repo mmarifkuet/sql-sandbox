@@ -4,8 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SQL Playground Pro</title>
+
+  <!-- Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sql-formatter@12.2.0/dist/sql-formatter.min.js"></script>
+
+  <!-- CodeMirror Editor Styling & Scripts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/sql/sql.min.js"></script>
+
   <style>
     :root {
       --bg-dark: #0f172a;
@@ -22,23 +32,24 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-dark); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; }
 
-    header { background: #1e293b; padding: 16px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    header { background: #1e293b; padding: 12px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
     header h1 { font-size: 1.25rem; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .header-controls { display: flex; gap: 10px; align-items: center; }
 
     .app-container { display: flex; flex: 1; overflow: hidden; }
 
     /* Sidebar */
-    sidebar { width: 300px; background: #0f172a; border-right: 1px solid var(--border-color); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+    sidebar { width: 280px; background: #0f172a; border-right: 1px solid var(--border-color); padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
     .sidebar-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-    
+
     .table-badge { background: #1e293b; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; font-family: monospace; color: var(--accent-blue); display: flex; justify-content: space-between; }
-    
+
     .btn-small { background: var(--card-bg); border: 1px solid var(--border-color); color: var(--accent-blue); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
     .btn-small:hover { background: var(--accent-blue); color: #0f172a; }
 
     .challenge-card { background: #1e293b; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
     .challenge-card:hover { border-color: var(--accent-blue); }
-    .challenge-card.active { border-color: var(--accent-purple); background: #26334d; }
     .challenge-title { font-size: 0.85rem; font-weight: bold; color: var(--accent-blue); }
     .challenge-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
 
@@ -52,13 +63,14 @@
     .tab-content { display: none; flex-direction: column; gap: 16px; flex: 1; }
     .tab-content.active { display: flex; }
 
-    .editor-wrapper { position: relative; }
-    textarea { width: 100%; height: 120px; background: #1e293b; color: #38bdf8; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-family: 'Fira Code', monospace; font-size: 0.95rem; outline: none; resize: vertical; }
+    .CodeMirror { height: 150px; border-radius: 8px; border: 1px solid var(--border-color); font-family: 'Fira Code', monospace; font-size: 0.95rem; }
 
-    .actions-bar { display: flex; gap: 12px; align-items: center; }
-    .btn-primary { background: linear-gradient(135deg, #0284c7, #4f46e5); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-    .btn-secondary { background: #1e293b; color: var(--accent-purple); border: 1px solid var(--border-color); padding: 10px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .actions-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .btn-primary { background: linear-gradient(135deg, #0284c7, #4f46e5); color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .btn-secondary { background: #1e293b; color: var(--accent-purple); border: 1px solid var(--border-color); padding: 10px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
     .btn-secondary:hover { border-color: var(--accent-purple); }
+
+    select, input[type="file"] { background: #1e293b; color: var(--text-main); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; outline: none; }
 
     .results-card { background: #1e293b; border-radius: 8px; border: 1px solid var(--border-color); padding: 16px; min-height: 200px; flex: 1; overflow-x: auto; }
     .status-bar { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
@@ -83,7 +95,16 @@
 
   <header>
     <h1>SQL Playground Pro</h1>
-    <span style="color: var(--text-muted); font-size: 0.85rem;">Engine: SQLite (WebAssembly)</span>
+    <div class="header-controls">
+      <select id="presetDbSelect" onchange="loadPresetDatabase()">
+        <option value="default">Dataset: Default Sandbox</option>
+        <option value="ecommerce">Dataset: E-Commerce Store</option>
+        <option value="company">Dataset: HR & Company</option>
+      </select>
+      <button class="btn-secondary" onclick="exportDatabase()">Export .sqlite 💾</button>
+      <input type="file" id="importInput" accept=".sqlite,.db" style="display:none;" onchange="importDatabase(event)">
+      <button class="btn-secondary" onclick="document.getElementById('importInput').click()">Import .db 📂</button>
+    </div>
   </header>
 
   <div class="app-container">
@@ -109,13 +130,14 @@
 
       <!-- Tab 1: Editor -->
       <div id="tab-editor" class="tab-content active">
-        <div class="editor-wrapper">
-          <textarea id="queryInput" placeholder="Write your SQL query here..."></textarea>
+        <div>
+          <textarea id="queryInput">SELECT * FROM users;</textarea>
         </div>
 
         <div class="actions-bar">
           <button class="btn-primary" id="runBtn">Run Query ▶</button>
-          <button class="btn-secondary" id="explainBtn">Explain Query Plan 🔍</button>
+          <button class="btn-secondary" id="formatBtn">Format SQL ✨</button>
+          <button class="btn-secondary" id="explainBtn">Explain Plan 🔍</button>
           <button class="btn-secondary" id="checkBtn">Check Answer ✔</button>
         </div>
 
@@ -157,7 +179,7 @@
         </div>
       </div>
       <button class="btn-small" onclick="addColumnRow()" style="margin-bottom:16px;">+ Add Column</button>
-      <div style="display:flex; justify-end:flex-end; gap:8px;">
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
         <button class="btn-secondary" onclick="closeCreateTableModal()">Cancel</button>
         <button class="btn-primary" onclick="submitCreateTable()">Create Table</button>
       </div>

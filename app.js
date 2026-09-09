@@ -1,4 +1,6 @@
 let db = null;
+let SQL = null;
+let editor = null;
 let currentChallenge = null;
 
 mermaid.initialize({ startOnLoad: false, theme: 'dark' });
@@ -11,26 +13,55 @@ const challenges = [
 async function initDatabase() {
   const config = { locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` };
   try {
-    const SQL = await initSqlJs(config);
-    db = new SQL.Database();
-    seedData();
-    renderSchema();
+    SQL = await initSqlJs(config);
+    
+    // Initialize CodeMirror Editor
+    editor = CodeMirror.fromTextArea(document.getElementById('queryInput'), {
+      mode: 'text/x-sql',
+      theme: 'dracula',
+      lineNumbers: true,
+      viewportMargin: Infinity
+    });
+
+    loadPresetDatabase();
     renderChallenges();
-    document.getElementById('queryInput').value = "SELECT * FROM users;";
-    runQuery();
   } catch (err) {
     document.getElementById('statusBar').innerText = "Initialization failed: " + err.message;
   }
 }
 
-function seedData() {
-  db.run(`
-    CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, role TEXT);
-    INSERT INTO users VALUES (1, 'Alice', 'Admin'), (2, 'Bob', 'Developer');
+function loadPresetDatabase() {
+  const preset = document.getElementById('presetDbSelect').value;
+  db = new SQL.Database();
 
-    CREATE TABLE products (id INTEGER PRIMARY KEY, title TEXT, price REAL);
-    INSERT INTO products VALUES (101, 'Laptop', 1200.00), (102, 'Mouse', 25.50);
-  `);
+  if (preset === 'default') {
+    db.run(`
+      CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, role TEXT);
+      INSERT INTO users VALUES (1, 'Alice', 'Admin'), (2, 'Bob', 'Developer'), (3, 'Charlie', 'Designer');
+
+      CREATE TABLE products (id INTEGER PRIMARY KEY, title TEXT, price REAL);
+      INSERT INTO products VALUES (101, 'Laptop', 1200.00), (102, 'Mouse', 25.50), (103, 'Keyboard', 85.00);
+    `);
+    editor.setValue("SELECT * FROM users;");
+  } else if (preset === 'ecommerce') {
+    db.run(`
+      CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT, email TEXT);
+      INSERT INTO customers VALUES (1, 'John Doe', 'john@example.com'), (2, 'Jane Smith', 'jane@example.com');
+
+      CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INT, amount REAL);
+      INSERT INTO orders VALUES (5001, 1, 299.99), (5002, 1, 49.50), (5003, 2, 150.00);
+    `);
+    editor.setValue("SELECT customers.name, orders.amount FROM customers JOIN orders ON customers.id = orders.customer_id;");
+  } else if (preset === 'company') {
+    db.run(`
+      CREATE TABLE employees (id INTEGER PRIMARY KEY, name TEXT, department TEXT, salary INT);
+      INSERT INTO employees VALUES (10, 'Sarah', 'Engineering', 95000), (11, 'Alex', 'Marketing', 62000), (12, 'Michael', 'Engineering', 88000);
+    `);
+    editor.setValue("SELECT department, AVG(salary) AS avg_salary FROM employees GROUP BY department;");
+  }
+
+  renderSchema();
+  runQuery();
 }
 
 function renderSchema() {
@@ -56,7 +87,7 @@ function renderChallenges() {
     card.className = 'challenge-card';
     card.onclick = () => {
       currentChallenge = ch;
-      document.getElementById('queryInput').value = '';
+      editor.setValue('');
       document.getElementById('statusBar').innerText = `Task: ${ch.description}`;
     };
     card.innerHTML = `<div class="challenge-title">${ch.title}</div><div class="challenge-desc">${ch.description}</div>`;
@@ -71,6 +102,7 @@ function switchTab(tab) {
   if (tab === 'editor') {
     document.querySelectorAll('.tab-btn')[0].classList.add('active');
     document.getElementById('tab-editor').classList.add('active');
+    setTimeout(() => editor.refresh(), 10);
   } else {
     document.querySelectorAll('.tab-btn')[1].classList.add('active');
     document.getElementById('tab-er').classList.add('active');
@@ -78,12 +110,16 @@ function switchTab(tab) {
 }
 
 function runQuery() {
-  return executeSQL(document.getElementById('queryInput').value);
+  return executeSQL(editor.getValue());
 }
 
 function explainQuery() {
-  const q = document.getElementById('queryInput').value;
-  executeSQL(`EXPLAIN QUERY PLAN ${q}`);
+  executeSQL(`EXPLAIN QUERY PLAN ${editor.getValue()}`);
+}
+
+function formatSQL() {
+  const formatted = sqlFormatter.format(editor.getValue(), { language: 'sql' });
+  editor.setValue(formatted);
 }
 
 function executeSQL(sql) {
@@ -119,7 +155,7 @@ function executeSQL(sql) {
     tableOutput.appendChild(table);
     return results[0];
   } catch (err) {
-    statusBar.innerText = "Error execution failed.";
+    statusBar.innerText = "Error executing query.";
     tableOutput.innerHTML = `<span style="color:#f87171;">${err.message}</span>`;
     return null;
   }
@@ -141,6 +177,31 @@ function checkAnswer() {
     vBox.style.color = '#f87171';
     vBox.innerText = "❌ Incorrect result. Keep trying!";
   }
+}
+
+/* Import / Export Database */
+function exportDatabase() {
+  const binaryArray = db.export();
+  const blob = new Blob([binaryArray], { type: 'application/x-sqlite3' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'sandbox_database.sqlite';
+  link.click();
+}
+
+function importDatabase(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function() {
+    const Uints = new Uint8Array(reader.result);
+    db = new SQL.Database(Uints);
+    renderSchema();
+    editor.setValue("SELECT name FROM sqlite_master WHERE type='table';");
+    runQuery();
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 /* ER Diagram Generator */
@@ -210,6 +271,7 @@ function submitCreateTable() {
 }
 
 document.getElementById('runBtn').addEventListener('click', runQuery);
+document.getElementById('formatBtn').addEventListener('click', formatSQL);
 document.getElementById('explainBtn').addEventListener('click', explainQuery);
 document.getElementById('checkBtn').addEventListener('click', checkAnswer);
 window.addEventListener('DOMContentLoaded', initDatabase);
