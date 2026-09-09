@@ -1,60 +1,36 @@
 let db = null;
 let currentChallenge = null;
 
+mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+
 const challenges = [
-  {
-    id: 1,
-    title: "1. Filter Admins",
-    description: "Select the 'name' and 'role' of all users whose role is 'Admin'.",
-    targetQuery: "SELECT name, role FROM users WHERE role = 'Admin';"
-  },
-  {
-    id: 2,
-    title: "2. Premium Products",
-    description: "Find all product titles and prices where price is greater than 50.",
-    targetQuery: "SELECT title, price FROM products WHERE price > 50;"
-  },
-  {
-    id: 3,
-    title: "3. Total Users Count",
-    description: "Write a query to count total records in the users table as 'total'.",
-    targetQuery: "SELECT COUNT(*) as total FROM users;"
-  }
+  { id: 1, title: "1. Admins Only", description: "Select name and role from users where role is Admin", target: "SELECT name, role FROM users WHERE role='Admin';" },
+  { id: 2, title: "2. High Price Items", description: "Select title and price from products where price > 50", target: "SELECT title, price FROM products WHERE price > 50;" }
 ];
 
 async function initDatabase() {
-  const config = {
-    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}`
-  };
-
+  const config = { locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${file}` };
   try {
     const SQL = await initSqlJs(config);
     db = new SQL.Database();
-    
     seedData();
     renderSchema();
     renderChallenges();
-    selectChallenge(1);
-    
-    document.getElementById('statusBar').innerText = "Database ready.";
+    document.getElementById('queryInput').value = "SELECT * FROM users;";
+    runQuery();
   } catch (err) {
-    document.getElementById('statusBar').innerText = "Failed to load database: " + err.message;
+    document.getElementById('statusBar').innerText = "Initialization failed: " + err.message;
   }
 }
 
 function seedData() {
-  const setupSQL = `
+  db.run(`
     CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, role TEXT);
-    INSERT INTO users VALUES (1, 'Alice', 'Admin');
-    INSERT INTO users VALUES (2, 'Bob', 'Developer');
-    INSERT INTO users VALUES (3, 'Charlie', 'Designer');
+    INSERT INTO users VALUES (1, 'Alice', 'Admin'), (2, 'Bob', 'Developer');
 
     CREATE TABLE products (id INTEGER PRIMARY KEY, title TEXT, price REAL);
-    INSERT INTO products VALUES (101, 'Laptop', 1200.00);
-    INSERT INTO products VALUES (102, 'Wireless Mouse', 25.50);
-    INSERT INTO products VALUES (103, 'Mechanical Keyboard', 85.00);
-  `;
-  db.run(setupSQL);
+    INSERT INTO products VALUES (101, 'Laptop', 1200.00), (102, 'Mouse', 25.50);
+  `);
 }
 
 function renderSchema() {
@@ -65,120 +41,175 @@ function renderSchema() {
     res[0].values.forEach(row => {
       const div = document.createElement('div');
       div.className = 'table-badge';
-      div.innerText = `📁 ${row[0]}`;
+      div.innerHTML = `<span>📁 ${row[0]}</span>`;
       schemaList.appendChild(div);
     });
   }
+  renderERDiagram();
 }
 
 function renderChallenges() {
   const container = document.getElementById('challengeList');
   container.innerHTML = '';
-
   challenges.forEach(ch => {
     const card = document.createElement('div');
-    card.className = `challenge-card ${currentChallenge?.id === ch.id ? 'active' : ''}`;
-    card.onclick = () => selectChallenge(ch.id);
-    card.innerHTML = `
-      <div class="challenge-title">${ch.title}</div>
-      <div class="challenge-desc">${ch.description}</div>
-    `;
+    card.className = 'challenge-card';
+    card.onclick = () => {
+      currentChallenge = ch;
+      document.getElementById('queryInput').value = '';
+      document.getElementById('statusBar').innerText = `Task: ${ch.description}`;
+    };
+    card.innerHTML = `<div class="challenge-title">${ch.title}</div><div class="challenge-desc">${ch.description}</div>`;
     container.appendChild(card);
   });
 }
 
-function selectChallenge(id) {
-  currentChallenge = challenges.find(c => c.id === id);
-  renderChallenges();
-  document.getElementById('challengeBanner').innerHTML = `
-    <strong>Task:</strong> ${currentChallenge.description}
-  `;
-  document.getElementById('queryInput').value = '';
-  hideValidation();
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  
+  if (tab === 'editor') {
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.getElementById('tab-editor').classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    document.getElementById('tab-er').classList.add('active');
+  }
 }
 
 function runQuery() {
-  if (!db) return null;
-  hideValidation();
+  return executeSQL(document.getElementById('queryInput').value);
+}
 
-  const query = document.getElementById('queryInput').value;
+function explainQuery() {
+  const q = document.getElementById('queryInput').value;
+  executeSQL(`EXPLAIN QUERY PLAN ${q}`);
+}
+
+function executeSQL(sql) {
+  if (!db) return;
   const tableOutput = document.getElementById('tableOutput');
   const statusBar = document.getElementById('statusBar');
   tableOutput.innerHTML = '';
 
   const startTime = performance.now();
-
   try {
-    const results = db.exec(query);
-    const executionTime = (performance.now() - startTime).toFixed(2);
+    const results = db.exec(sql);
+    const time = (performance.now() - startTime).toFixed(2);
 
     if (results.length === 0) {
-      statusBar.innerText = `Executed in ${executionTime}ms. (No rows returned)`;
+      statusBar.innerText = `Executed in ${time}ms. (No rows returned)`;
       return null;
     }
 
     const { columns, values } = results[0];
-    statusBar.innerText = `Executed in ${executionTime}ms. Returned ${values.length} row(s).`;
+    statusBar.innerText = `Executed in ${time}ms. Returned ${values.length} row(s).`;
 
     const table = document.createElement('table');
     const trHead = document.createElement('tr');
-    columns.forEach(col => {
-      const th = document.createElement('th');
-      th.innerText = col;
-      trHead.appendChild(th);
-    });
+    columns.forEach(c => { const th = document.createElement('th'); th.innerText = c; trHead.appendChild(th); });
     table.appendChild(trHead);
 
     values.forEach(row => {
       const trRow = document.createElement('tr');
-      row.forEach(cell => {
-        const td = document.createElement('td');
-        td.innerText = cell;
-        trRow.appendChild(td);
-      });
+      row.forEach(cell => { const td = document.createElement('td'); td.innerText = cell; trRow.appendChild(td); });
       table.appendChild(trRow);
     });
 
     tableOutput.appendChild(table);
     return results[0];
-  } catch (error) {
-    statusBar.innerText = "Error executing query.";
-    tableOutput.innerHTML = `<span style="color: #ef4444; font-family: monospace;">SQL Error: ${error.message}</span>`;
+  } catch (err) {
+    statusBar.innerText = "Error execution failed.";
+    tableOutput.innerHTML = `<span style="color:#f87171;">${err.message}</span>`;
     return null;
   }
 }
 
 function checkAnswer() {
-  if (!currentChallenge) return;
+  if (!currentChallenge) return alert('Select a challenge from the sidebar first!');
+  const userRes = runQuery();
+  const targetRes = db.exec(currentChallenge.target)[0];
+  const vBox = document.getElementById('validationBox');
+  vBox.style.display = 'block';
 
-  const userResult = runQuery();
-  const expectedResult = db.exec(currentChallenge.targetQuery)[0];
-
-  const valBox = document.getElementById('validationBox');
-  valBox.style.display = 'block';
-
-  if (!userResult) {
-    valBox.className = 'validation-msg validation-error';
-    valBox.innerText = '❌ Incorrect. Your query did not return any valid results.';
-    return;
-  }
-
-  const isMatch = JSON.stringify(userResult) === JSON.stringify(expectedResult);
-
-  if (isMatch) {
-    valBox.className = 'validation-msg validation-success';
-    valBox.innerText = '🎉 Correct! Your query matches the expected output.';
+  if (userRes && JSON.stringify(userRes) === JSON.stringify(targetRes)) {
+    vBox.style.background = 'rgba(74, 222, 128, 0.2)';
+    vBox.style.color = '#4ade80';
+    vBox.innerText = "🎉 Correct answer!";
   } else {
-    valBox.className = 'validation-msg validation-error';
-    valBox.innerText = '❌ Incorrect result structure or values. Try adjusting your query!';
+    vBox.style.background = 'rgba(248, 113, 113, 0.2)';
+    vBox.style.color = '#f87171';
+    vBox.innerText = "❌ Incorrect result. Keep trying!";
   }
 }
 
-function hideValidation() {
-  const valBox = document.getElementById('validationBox');
-  valBox.style.display = 'none';
+/* ER Diagram Generator */
+async function renderERDiagram() {
+  const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table';");
+  if (tables.length === 0) return;
+
+  let diagramText = "erDiagram\n";
+  tables[0].values.forEach(row => {
+    const tName = row[0];
+    const cols = db.exec(`PRAGMA table_info(${tName});`);
+    diagramText += `  ${tName} {\n`;
+    if (cols.length > 0) {
+      cols[0].values.forEach(c => {
+        diagramText += `    ${c[2]} ${c[1]}\n`;
+      });
+    }
+    diagramText += `  }\n`;
+  });
+
+  const element = document.getElementById('mermaidDiagram');
+  element.removeAttribute('data-processed');
+  element.innerHTML = diagramText;
+  await mermaid.run({ nodes: [element] });
+}
+
+/* Modal Helpers */
+function openCreateTableModal() { document.getElementById('tableModal').style.display = 'flex'; }
+function closeCreateTableModal() { document.getElementById('tableModal').style.display = 'none'; }
+
+function addColumnRow() {
+  const container = document.getElementById('columnsContainer');
+  const div = document.createElement('div');
+  div.className = 'column-row';
+  div.innerHTML = `
+    <input type="text" placeholder="Column Name" class="col-name">
+    <select class="col-type">
+      <option value="TEXT">TEXT</option>
+      <option value="INTEGER">INTEGER</option>
+      <option value="REAL">REAL</option>
+    </select>
+  `;
+  container.appendChild(div);
+}
+
+function submitCreateTable() {
+  const tableName = document.getElementById('modalTableName').value.trim();
+  if (!tableName) return alert('Enter a table name');
+
+  const names = document.querySelectorAll('.col-name');
+  const types = document.querySelectorAll('.col-type');
+  const cols = [];
+
+  names.forEach((input, index) => {
+    if (input.value.trim()) {
+      cols.push(`${input.value.trim()} ${types[index].value}`);
+    }
+  });
+
+  if (cols.length === 0) return alert('Add at least one column');
+
+  const sql = `CREATE TABLE ${tableName} (${cols.join(', ')});`;
+  db.run(sql);
+  renderSchema();
+  closeCreateTableModal();
+  document.getElementById('statusBar').innerText = `Table '${tableName}' created successfully.`;
 }
 
 document.getElementById('runBtn').addEventListener('click', runQuery);
+document.getElementById('explainBtn').addEventListener('click', explainQuery);
 document.getElementById('checkBtn').addEventListener('click', checkAnswer);
 window.addEventListener('DOMContentLoaded', initDatabase);
