@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sql-formatter@12.2.0/dist/sql-formatter.min.js"></script>
 
-  <!-- CodeMirror Editor Styling & Scripts -->
+  <!-- CodeMirror Editor -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
@@ -52,6 +52,7 @@
     .challenge-card:hover { border-color: var(--accent-blue); }
     .challenge-title { font-size: 0.85rem; font-weight: bold; color: var(--accent-blue); }
     .challenge-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .challenge-card.completed { border-color: var(--accent-green); }
 
     /* Main Area */
     main { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 16px; overflow-y: auto; }
@@ -78,6 +79,10 @@
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     th { background: #0f172a; color: var(--accent-blue); text-align: left; padding: 10px; border-bottom: 2px solid var(--border-color); font-size: 0.9rem; }
     td { padding: 10px; border-bottom: 1px solid var(--border-color); color: var(--text-main); font-size: 0.9rem; }
+
+    /* History Panel Item */
+    .history-item { background: #1e293b; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 6px; font-family: monospace; font-size: 0.8rem; color: var(--text-main); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-item:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
 
     /* Modal */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); align-items: center; justify-content: center; z-index: 100; }
@@ -115,6 +120,13 @@
           <button class="btn-small" onclick="openCreateTableModal()">+ New Table</button>
         </div>
         <div id="schemaList">Loading...</div>
+      </div>
+      <div>
+        <div class="sidebar-title">
+          Query History
+          <button class="btn-small" onclick="clearHistory()">Clear</button>
+        </div>
+        <div id="historyList">No recent queries.</div>
       </div>
       <div>
         <div class="sidebar-title">Challenges</div>
