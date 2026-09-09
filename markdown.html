@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Markdown Live Editor</title>
+
+  <!-- Marked JS for Markdown Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- CodeMirror Editor -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/markdown/markdown.min.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --accent-blue: #38bdf8;
+      --accent-purple: #818cf8;
+      --accent-green: #4ade80;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-dark); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; }
+
+    header { background: #1e293b; padding: 12px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 1.25rem; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .header-actions { display: flex; gap: 10px; }
+    .btn-secondary { background: var(--card-bg); color: var(--accent-blue); border: 1px solid var(--border-color); padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85rem; }
+    .btn-secondary:hover { border-color: var(--accent-blue); }
+
+    .app-container { display: flex; flex: 1; overflow: hidden; padding: 16px; gap: 16px; }
+
+    .pane { flex: 1; display: flex; flex-direction: column; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+    .pane-header { background: #0f172a; padding: 10px 16px; font-size: 0.85rem; font-weight: bold; color: var(--text-muted); border-bottom: 1px solid var(--border-color); text-transform: uppercase; letter-spacing: 1px; }
+
+    .CodeMirror { flex: 1; height: 100%; font-family: 'Fira Code', monospace; font-size: 0.9rem; }
+
+    .markdown-body { flex: 1; padding: 20px; overflow-y: auto; color: #e2e8f0; font-size: 0.95rem; line-height: 1.6; }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--accent-blue); margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; }
+    .markdown-body p { margin-bottom: 12px; }
+    .markdown-body code { background: #0f172a; color: #facc15; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; }
+    .markdown-body pre { background: #0f172a; padding: 12px; border-radius: 6px; overflow-x: auto; margin-bottom: 12px; border: 1px solid var(--border-color); }
+    .markdown-body ul, .markdown-body ol { padding-left: 20px; margin-bottom: 12px; }
+    .markdown-body blockquote { border-left: 4px solid var(--accent-purple); padding-left: 12px; color: var(--text-muted); margin-bottom: 12px; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    .markdown-body th, .markdown-body td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+    .markdown-body th { background: #0f172a; color: var(--accent-blue); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Markdown Live Previewer</h1>
+    <div class="header-actions">
+      <button class="btn-secondary" onclick="exportMarkdown()">Download .md 💾</button>
+      <button class="btn-secondary" onclick="exportHTML()">Download .html 📄</button>
+    </div>
+  </header>
+
+  <div class="app-container">
+    <div class="pane">
+      <div class="pane-header">Markdown Input</div>
+      <textarea id="markdownInput"># Markdown Live Editor 🚀
+
+Welcome to the live Markdown editor!
+
+## Features
+- **Real-Time Rendering**: Instant updates as you type.
+- *Formatted Formatting*: Headers, lists, code blocks, tables, and blockquotes.
+- Export options for `.md` and `.html`.
+
+### Sample Code Block
+```js
+function greet(name) {
+  return `Hello, ${name}!`;
+}
+console.log(greet('Developer'));
